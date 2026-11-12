@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>reel-kinetic-3d</title>
+<link rel="stylesheet" href="/templates/shared/base.css">
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js" } }</script>
+<style>
+  :root {
+    --bg1: #120f2b; --bg2: #2b1f5c; --accent: #ff5c8a; --accent2: #7c5cff; --text: #ffffff;
+    --W: 1080px; --H: 1920px;
+  }
+  body { width: var(--W); height: var(--H); background: var(--bg1); color: var(--text); }
+  #bg { position: absolute; inset: 0; background: linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%); overflow: hidden; }
+  .blob { position: absolute; width: 1100px; height: 1100px; border-radius: 50%; filter: blur(140px); opacity: .55; }
+  #blob1 { background: var(--accent); }
+  #blob2 { background: var(--accent2); }
+  #gl { position: absolute; inset: 0; width: var(--W); height: var(--H); }
+  #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,.45) 100%); }
+
+  /* Strefy bezpieczne Reels: góra ~220px i dół ~380px zasłania interfejs Instagrama */
+  #progress { position: absolute; top: 210px; left: 90px; right: 90px; display: flex; gap: 12px; }
+  #progress .seg { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.22); overflow: hidden; }
+  #progress .fill { height: 100%; width: 0%; background: var(--text); }
+  #handle { position: absolute; top: 250px; left: 90px; font-size: 34px; font-weight: 600; letter-spacing: .02em; opacity: .85; }
+
+  #stage { position: absolute; left: 90px; right: 90px; top: 860px; bottom: 400px; }
+  .scene { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 36px; opacity: 0; }
+  .word { display: inline-block; white-space: pre; will-change: transform, opacity, filter; }
+  .accent { color: var(--accent); position: relative; }
+  .kicker { align-self: flex-start; font-size: 34px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+            padding: 16px 28px; border-radius: 999px; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.25); }
+  .title { font-weight: 900; line-height: 1.02; letter-spacing: -0.035em; }
+  .hook .title { font-size: 128px; }
+  .point .title { font-size: 92px; }
+  .cta .title { font-size: 104px; }
+  .num { font-size: 210px; font-weight: 900; line-height: .8; letter-spacing: -0.05em; color: transparent;
+         -webkit-text-stroke: 4px var(--accent); }
+  .body { font-size: 46px; font-weight: 500; line-height: 1.3; opacity: .82; max-width: 860px; }
+  .button { align-self: flex-start; font-size: 46px; font-weight: 800; padding: 30px 54px; border-radius: 999px;
+            background: var(--accent); color: var(--bg1); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+</style>
+</head>
+<body>
+<div id="bg"><div class="blob" id="blob1"></div><div class="blob" id="blob2"></div></div>
+<canvas id="gl" width="1080" height="1920"></canvas>
+<div id="vignette"></div>
+<div id="progress"></div>
+<div id="handle"></div>
+<div id="stage"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { clamp, lerp, progress, ease, seeded, timeline, sceneAt, markupWords } from '/templates/shared/anim.js';
+
+const spec = window.__SPEC__ ?? {
+  brand: { handle: '@twojamarka' },
+  scenes: [
+    { type: 'hook', kicker: 'Podgląd', title: 'Szablon *działa*' },
+    { type: 'point', title: 'Punkt pierwszy', body: 'Opis punktu.' },
+    { type: 'cta', title: 'Zapisz na *później*', button: 'Obserwuj' },
+  ],
+};
+const brand = spec.brand ?? {};
+const root = document.documentElement.style;
+for (const k of ['bg1', 'bg2', 'accent', 'accent2', 'text']) if (brand[k]) root.setProperty('--' + k, brand[k]);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
+
+const W = 1080, H = 1920;
+const tl = timeline(spec.scenes, 3.5);
+window.__DURATION__ = spec.duration ?? tl.total;
+
+// ---------- DOM: budujemy wszystkie sceny z góry ----------
+document.getElementById('handle').textContent = brand.handle ?? '';
+const progressEl = document.getElementById('progress');
+const fills = tl.items.map(() => {
+  const seg = document.createElement('div'); seg.className = 'seg';
+  const f = document.createElement('div'); f.className = 'fill'; seg.appendChild(f);
+  progressEl.appendChild(seg); return f;
+});
+
+const wordsHTML = (text) => markupWords(text)
+  .map((w) => `<span class="word${w.accent ? ' accent' : ''}">${w.html}</span>`).join('<span class="word"> </span>');
+
+let pointNo = 0;
+const sceneEls = tl.items.map((s) => {
+  const el = document.createElement('div');
+  el.className = `scene ${s.type ?? 'point'}`;
+  let html = '';
+  if (s.kicker) html += `<div class="kicker part">${s.kicker}</div>`;
+  if (s.type === 'point') html += `<div class="num part">${String(s.number ?? ++pointNo).padStart(2, '0')}</div>`;
+  if (s.title) html += `<div class="title">${wordsHTML(s.title)}</div>`;
+  if (s.body) html += `<div class="body">${wordsHTML(s.body)}</div>`;
+  if (s.button) html += `<div class="button part">${s.button}</div>`;
+  el.innerHTML = html;
+  document.getElementById('stage').appendChild(el);
+  // kolejność animacji: elementy "part" i pojedyncze słowa
+  const animated = [...el.querySelectorAll('.part, .title .word, .body .word')];
+  return { el, animated };
+});
+
+// ---------- three.js ----------
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), alpha: true, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H, false);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, W / H, 0.1, 100);
+camera.position.set(0, 0, 10);
+
+const accent = new THREE.Color(css('accent'));
+const accent2 = new THREE.Color(css('accent2'));
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const l1 = new THREE.PointLight(accent, 60, 30); l1.position.set(4, 4, 6); scene.add(l1);
+const l2 = new THREE.PointLight(accent2, 60, 30); l2.position.set(-5, -2, 5); scene.add(l2);
+const l3 = new THREE.DirectionalLight(0xffffff, 1.2); l3.position.set(0, 5, 8); scene.add(l3);
+
+const hero = new THREE.Group();
+const geo = new THREE.IcosahedronGeometry(1, 1);
+const core = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: accent, flatShading: true, roughness: 0.35, metalness: 0.25 }));
+const wire = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(1.32, 1)),
+  new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }));
+const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.025, 16, 160), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
+const ring2 = new THREE.Mesh(new THREE.TorusGeometry(2.25, 0.012, 16, 160), new THREE.MeshBasicMaterial({ color: accent2, transparent: true, opacity: 0.8 }));
+hero.add(core, wire, ring, ring2);
+scene.add(hero);
+
+// cząsteczki
+const rnd = seeded(spec.seed ?? 7);
+const N = 1400;
+const base = new Float32Array(N * 3), speed = new Float32Array(N);
+for (let i = 0; i < N; i++) {
+  base[i * 3] = (rnd() - 0.5) * 12; base[i * 3 + 1] = (rnd() - 0.5) * 20; base[i * 3 + 2] = (rnd() - 0.5) * 8 - 2;
+  speed[i] = 0.08 + rnd() * 0.25;
+}
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(N * 3);
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.035, transparent: true, opacity: 0.7, sizeAttenuation: true }));
+scene.add(particles);
+
+// gdzie stoi bryła w danym typie sceny (jednostki świata; ~305 px = 1 jednostka)
+const layout = {
+  hook:  { x: 0.55, y: 1.35, s: 0.74 },
+  point: { x: 1.35, y: 1.45, s: 0.56 },
+  cta:   { x: 0,    y: 1.4,  s: 0.7 },
+};
+const lay = (s) => layout[s?.type] ?? layout.point;
+
+// ---------- klatka ----------
+window.__renderFrame = (t) => {
+  const { scene: s, local } = sceneAt(tl, t);
+  const prev = tl.items[s.index - 1];
+
+  // tło
+  const b1 = document.getElementById('blob1').style, b2 = document.getElementById('blob2').style;
+  b1.transform = `translate(${-300 + Math.sin(t * 0.5) * 220}px, ${-250 + Math.cos(t * 0.4) * 180}px)`;
+  b2.transform = `translate(${300 + Math.cos(t * 0.35) * 240}px, ${1100 + Math.sin(t * 0.45) * 200}px)`;
+
+  // pasek postępu
+  tl.items.forEach((it, i) => { fills[i].style.width = `${clamp((t - it.start) / it.duration) * 100}%`; });
+
+  // tekst
+  sceneEls.forEach(({ el, animated }, i) => {
+    if (i !== s.index) { el.style.opacity = 0; return; }
+    const out = ease.inCubic(progress(local, s.duration - 0.4, 0.4));
+    const isLast = s.index === tl.items.length - 1;
+    el.style.opacity = isLast ? 1 : 1 - out;
+    el.style.transform = `translateY(${isLast ? 0 : -60 * out}px)`;
+    el.style.filter = !isLast && out > 0 ? `blur(${out * 12}px)` : 'none';
+    animated.forEach((w, k) => {
+      const p = progress(local, 0.15 + k * 0.055, 0.55);
+      const e = ease.outCubic(p);
+      w.style.opacity = e;
+      w.style.transform = `translateY(${(1 - ease.outBack(p)) * 70}px) scale(${lerp(0.92, 1, e)})`;
+      w.style.filter = p < 1 ? `blur(${(1 - e) * 14}px)` : 'none';
+    });
+  });
+
+  // bryła 3D: płynne przejście między pozycjami scen
+  const from = lay(prev ?? s), to = lay(s);
+  const m = ease.inOutCubic(progress(local, 0, 0.9));
+  const pulse = 1 + Math.sin(progress(local, 0, 0.6) * Math.PI) * 0.12;
+  hero.position.set(lerp(from.x, to.x, m), lerp(from.y, to.y, m) + Math.sin(t * 1.2) * 0.08, 0);
+  hero.scale.setScalar(lerp(from.s, to.s, m) * pulse * ease.outBack(clamp(t / 0.9)));
+  core.rotation.set(t * 0.35, t * 0.55, 0);
+  wire.rotation.set(-t * 0.25, t * 0.3, t * 0.1);
+  ring.rotation.set(1.1 + Math.sin(t * 0.6) * 0.25, t * 0.4, 0);
+  ring2.rotation.set(1.4, -t * 0.3, 0.4);
+
+  for (let i = 0; i < N; i++) {
+    pPos[i * 3] = base[i * 3] + Math.sin(t * 0.3 + i) * 0.15;
+    pPos[i * 3 + 1] = ((base[i * 3 + 1] + t * speed[i] + 10) % 20 + 20) % 20 - 10;
+    pPos[i * 3 + 2] = base[i * 3 + 2];
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  camera.position.x = Math.sin(t * 0.2) * 0.3;
+  camera.lookAt(0, 0, 0);
+
+  renderer.render(scene, camera);
+};
+
+await document.fonts.ready;
+window.__renderFrame(0);
+window.__READY__ = true;
+</script>
+</body>
+</html>

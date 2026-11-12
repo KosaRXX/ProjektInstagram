@@ -1,0 +1,18 @@
+{
+  "id": "przyklad-post",
+  "type": "post",
+  "template": "post-quote",
+  "brand": {
+    "handle": "@twojamarka",
+    "bg1": "#120f2b",
+    "bg2": "#2b1f5c",
+    "accent": "#ff5c8a",
+    "accent2": "#7c5cff"
+  },
+  "kicker": "Zasada tygodnia",
+  "title": "Regularność wygrywa z *perfekcją*",
+  "body": "Lepiej 3 dobre posty w tygodniu niż jeden idealny raz w miesiącu.",
+  "footer": "Zapisz ↓",
+  "caption": "Regularność > perfekcja. Algorytm i Twoi odbiorcy nagradzają konsekwencję 💪\n\nIle razy w tygodniu publikujesz?",
+  "hashtags": ["#marketing", "#socialmedia", "#instagramtips"]
+}

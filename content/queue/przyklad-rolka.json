@@ -1,0 +1,24 @@
+{
+  "id": "przyklad-rolka",
+  "type": "reel",
+  "template": "reel-kinetic-3d",
+  "fps": 30,
+  "music": "assets/music/podklad.mp3",
+  "brand": {
+    "handle": "@twojamarka",
+    "bg1": "#120f2b",
+    "bg2": "#2b1f5c",
+    "accent": "#ff5c8a",
+    "accent2": "#7c5cff",
+    "text": "#ffffff"
+  },
+  "scenes": [
+    { "type": "hook", "kicker": "Instagram 2026", "title": "3 błędy, które *zabijają* Twoje zasięgi", "duration": 3.4 },
+    { "type": "point", "title": "Brak *haka* w 1. sekundzie", "body": "Widz decyduje w mgnieniu oka. Zacznij od konkretu, nie od „cześć”.", "duration": 3.8 },
+    { "type": "point", "title": "Publikujesz *bez planu*", "body": "Algorytm lubi regularność. 3 posty w tygodniu > 10 w jeden dzień.", "duration": 3.8 },
+    { "type": "point", "title": "Zero *wezwania* do akcji", "body": "Powiedz wprost: zapisz, udostępnij, napisz w komentarzu.", "duration": 3.8 },
+    { "type": "cta", "title": "Zapisz, żeby *nie zapomnieć*", "button": "Obserwuj po więcej →", "duration": 3.2 }
+  ],
+  "caption": "3 błędy, które po cichu obcinają Twoje zasięgi 👇\n\n1️⃣ Brak haka w pierwszej sekundzie\n2️⃣ Publikowanie bez planu\n3️⃣ Brak wezwania do akcji\n\nKtóry z nich zdarza Ci się najczęściej? Napisz w komentarzu!",
+  "hashtags": ["#marketing", "#instagramtips", "#socialmedia", "#zasięgi", "#marketingonline"]
+}
